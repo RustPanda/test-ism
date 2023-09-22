@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use clap::Parser;
 use reqwest::Url;
+use tokio::signal;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -17,9 +18,13 @@ struct Opts {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Получаю аргументы коман
-    let opts = Opts::parse();
+    let _opts = Opts::parse();
 
-    println!("{opts:#?}");
+    loop {
+        tokio::select! {
+            _ = close_signal() => break,
+        }
+    }
 }
 
 // Парсер интервала
@@ -34,4 +39,32 @@ fn interval_parser(interval: &str) -> Result<Duration, String> {
 // Парсер URL
 fn url_parser(url: &str) -> Result<Url, String> {
     Url::parse(url).map_err(|_| "URL parsing error".to_string())
+}
+
+// Асинхронная функция ожидания сигнала ctrl+c
+// Скопирована из https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs#L31
+async fn close_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    println!("");
 }
