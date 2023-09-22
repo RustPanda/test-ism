@@ -18,11 +18,40 @@ struct Opts {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Получаю аргументы коман
-    let _opts = Opts::parse();
+    let Opts { interval, url } = Opts::parse();
+
+    let client = reqwest::Client::new();
+    let mut intervel = tokio::time::interval(interval);
 
     loop {
+        // Во время паузы тоже должны ждать сигнал
         tokio::select! {
-            _ = close_signal() => break,
+            _ = close_signal() => {
+                break;
+            },
+            _ = intervel.tick() => {}
+        }
+
+        let request = client.get(url.clone()).send();
+
+        tokio::select! {
+            _ = close_signal() => {
+                break;
+            },
+            response = request => {
+                match response {
+                    Ok(response) => {
+                        if response.status().is_success() {
+                            println!("Checking '{url}'. Result: OK(200)")
+                        } else {
+                            eprintln!("Checking '{url}'. Result: ERR({code})", code = response.status().as_u16());
+                        }
+                    }
+                    Err(error) => {
+                        eprintln!("Failed to check '{url}': {error}")
+                    }
+                }
+            }
         }
     }
 }
