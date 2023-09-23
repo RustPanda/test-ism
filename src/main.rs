@@ -48,25 +48,21 @@ async fn run_checkloop(url: Url, interval: Duration) {
     loop {
         intervel.tick().await;
 
-        let request = client.get(url.clone()).send();
+        let response = client.get(url.clone()).send().await;
 
-        tokio::select! {
-            _ = close_signal() => {
-                break;
-            },
-            response = request => {
-                match response {
-                    Ok(response) => {
-                        if response.status().is_success() {
-                            println!("Checking '{url}'. Result: OK(200)")
-                        } else {
-                            eprintln!("Checking '{url}'. Result: ERR({code})", code = response.status().as_u16());
-                        }
-                    }
-                    Err(error) => {
-                        eprintln!("Failed to check '{url}': {error}")
-                    }
+        match response {
+            Ok(response) => {
+                if response.status().is_success() {
+                    println!("Checking '{url}'. Result: OK(200)")
+                } else {
+                    eprintln!(
+                        "Checking '{url}'. Result: ERR({code})",
+                        code = response.status().as_u16()
+                    );
                 }
+            }
+            Err(error) => {
+                eprintln!("Failed to check '{url}': {error}")
             }
         }
     }
