@@ -52,7 +52,7 @@ async fn run_checkloop(url: Url, interval: Duration) {
 
         match response {
             Ok(response) => {
-                if response.status().is_success() {
+                if response.status().as_u16() == 200 {
                     println!("Checking '{url}'. Result: OK(200)")
                 } else {
                     eprintln!(
