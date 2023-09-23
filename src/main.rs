@@ -20,17 +20,33 @@ async fn main() {
     // Получаю аргументы коман
     let Opts { interval, url } = Opts::parse();
 
+    tokio::select! {
+        _ = run_checkloop(url, interval) => {},
+        _ = close_signal() => {},
+    }
+}
+
+// Парсер интервала
+fn interval_parser(interval: &str) -> Result<Duration, String> {
+    interval
+        .parse::<f32>()
+        .map_err(|_| ())
+        .and_then(|i| Duration::try_from_secs_f32(i).map_err(|_| ()))
+        .map_err(|_| "Interval parsing error".to_string())
+}
+
+// Парсер URL
+fn url_parser(url: &str) -> Result<Url, String> {
+    Url::parse(url).map_err(|_| "URL parsing error".to_string())
+}
+
+// Запуск цикла helthcheck
+async fn run_checkloop(url: Url, interval: Duration) {
     let client = reqwest::Client::new();
     let mut intervel = tokio::time::interval(interval);
 
     loop {
-        // Во время паузы тоже должны ждать сигнал
-        tokio::select! {
-            _ = close_signal() => {
-                break;
-            },
-            _ = intervel.tick() => {}
-        }
+        intervel.tick().await;
 
         let request = client.get(url.clone()).send();
 
@@ -54,20 +70,6 @@ async fn main() {
             }
         }
     }
-}
-
-// Парсер интервала
-fn interval_parser(interval: &str) -> Result<Duration, String> {
-    interval
-        .parse::<f32>()
-        .map_err(|_| ())
-        .and_then(|i| Duration::try_from_secs_f32(i).map_err(|_| ()))
-        .map_err(|_| "Interval parsing error".to_string())
-}
-
-// Парсер URL
-fn url_parser(url: &str) -> Result<Url, String> {
-    Url::parse(url).map_err(|_| "URL parsing error".to_string())
 }
 
 // Асинхронная функция ожидания сигнала ctrl+c
